@@ -85,19 +85,19 @@ fun ClockDialStateless(
     {
 
         // Ticks
-        for (i in 0..11){
+        for (i in 0..5){
             Tick(i,ticksColor)
         }
 
         // Dial (cover ticks)
-        Box(
+        /*Box(
             Modifier
                 .fillMaxWidth()
                 .padding(10.dp)
                 .aspectRatio(ratio = 1f)
                 .clip(CircleShape)
                 .background(dialColor)
-        )
+        )*/
 
         // Ticks numbers
         for (i in 12 downTo 1){
@@ -112,14 +112,45 @@ fun ClockDialStateless(
 }
 
 @Composable
-fun Tick(position: Int, color: Color = Color.Black){
-    Box(modifier = Modifier
-        .fillMaxHeight()
-        .width(2.dp)
-        .rotate(360f / 12 * position)
-        .clip(RectangleShape)
-        .background(color)
-    )
+fun Tick(position: Int, color: Color = Color.Black,
+         modifier: Modifier = Modifier){
+
+    val width = 5;
+    val height: Float = if(position % 3 == 0) 12f else 8f;
+
+    val shape = RoundedCornerShape((width*0.5).dp)
+    Column(
+        modifier = modifier
+            .fillMaxHeight(1f)
+            .width((width).dp)
+            .rotate(360f / 12 * position)
+            .padding(0.dp,4.dp)
+    ) {
+
+        Box(modifier = modifier
+            //.weight(0.5f) // Weight to split the total height
+            .fillMaxWidth()
+            .height((height).dp)
+            .width((width).dp)
+            .clip(shape)
+            .background(color)
+        )
+        Box(modifier = modifier
+            .weight(1f) // Weight to split the total height
+            .fillMaxWidth()
+            .clip(shape)
+            .background(Color.Transparent)
+        )
+        Box(modifier = modifier
+            //.weight(0.5f) // Weight to split the total height
+            .fillMaxWidth()
+            .height((height).dp)
+            .width((width).dp)
+            .clip(shape)
+            .background(color)
+        )
+    }
+
 }
 
 @Composable
@@ -145,13 +176,24 @@ fun TickNumber(
         .rotate(rotation),
         verticalArrangement = Arrangement.Top) {
 
+        Box(modifier = Modifier
+            .height(14.dp)
+            .background(Color.Transparent)
+        )
+
+        // Ternary operator:
+        // like C# float fontSize = (position % 3 == 0) ? 27f*1.3f : 27*1f;
+        val bigger = 27f*1.3f;
+        val smaller = 27*1f;
+        val fontSize: Float = if(position % 3 == 0) bigger else smaller;
+
         Text(
             modifier = Modifier
                 .rotate(-rotation)
-                .padding(10.dp),
+                .padding(0.dp),
             text = text,
             color = color,
-            fontSize = 27.sp,
+            fontSize = (fontSize).sp,
             textAlign = TextAlign.Center,
             fontWeight = GetFW()
         )
