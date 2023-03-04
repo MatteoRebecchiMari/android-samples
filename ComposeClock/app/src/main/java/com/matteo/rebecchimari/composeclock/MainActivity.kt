@@ -29,27 +29,56 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
 import com.matteo.rebecchimari.composeclock.ui.theme.ComposeClockTheme
+import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.flowOf
+import java.util.*
 import java.util.Collections.rotate
+import java.util.concurrent.Flow
 
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ComposeClockTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colors.background
-                ) {
+            ClockClockPage()
+        }
+    }
+}
+
+@Preview(showBackground = true, device = "id:pixel_5")
+@Composable
+fun DefaultPreview() {
+    ClockClockPage()
+}
+
+
+@Composable
+fun ClockClockPage() {
+
+    ComposeClockTheme {
+        // A surface container using the 'background' color from the theme
+        Surface(
+            modifier = Modifier.fillMaxSize(),
+            color = MaterialTheme.colors.background
+        ) {
+            Column() {
+                Box(Modifier.padding(10.dp)){
                     ClockStateful()
                 }
             }
         }
     }
+
 }
 
 @Composable
 fun ClockStateful() {
+
+    // Kotlin like Flutter (Dart)
+    // has removed the "new" keyword
+    val timer: Timer = Timer()
 
     ClockDialStateless()
     {
@@ -162,14 +191,6 @@ fun TickNumber(
 ){
     val rotation = 360f / maxPosition * position
 
-    fun GetFW(): FontWeight?
-    {
-        var fw: FontWeight? = null
-        if(position % 3 == 0){
-            fw = FontWeight.Bold
-        }
-        return fw
-    }
 
     Column ( modifier = Modifier
         .fillMaxHeight()
@@ -186,16 +207,17 @@ fun TickNumber(
         val bigger = 27f*1.3f;
         val smaller = 27*1f;
         val fontSize: Float = if(position % 3 == 0) bigger else smaller;
+        val fontWeight: FontWeight? = if(position % 3 == 0) FontWeight.Bold else null;
 
         Text(
             modifier = Modifier
-                .rotate(-rotation)
+                .rotate(-1*rotation)
                 .padding(0.dp),
             text = text,
             color = color,
             fontSize = (fontSize).sp,
             textAlign = TextAlign.Center,
-            fontWeight = GetFW()
+            fontWeight = fontWeight
         )
 
     }
@@ -232,10 +254,79 @@ fun ClockHand(
 
 }
 
-@Preview(showBackground = true, device = "id:pixel_5")
-@Composable
-fun DefaultPreview() {
-    ComposeClockTheme {
-        ClockStateful()
+class Timer() {
+
+    val seconds = MutableSharedFlow<Int>();
+    val minutes = MutableSharedFlow<Int>();
+    val hours = MutableSharedFlow<Int>();
+
+    init {
+        runBlocking {
+            launch {
+                val calendar = Calendar.getInstance()
+                seconds.emit(calendar.get(Calendar.SECOND))
+                minutes.emit(calendar.get(Calendar.MINUTE))
+                hours.emit(calendar.get(Calendar.HOUR))
+            }
+        }
     }
+
+    private var isRunning: Boolean = false;
+    private var timerJob: Job? = null
+
+    // runBlocking method blocks the current thread for waiting
+    // while coroutineScope just suspends
+
+    //private fun startTimer() = runBlocking {
+    private fun startTimer() = runBlocking {
+
+        timerJob = launch {
+
+            println("Timer started")
+
+            isRunning = true
+
+            while (isRunning){
+
+                // Wait 1 second
+                delay(1000)
+
+                val calendar = Calendar.getInstance()
+                seconds.emit(calendar.get(Calendar.SECOND))
+                minutes.emit(calendar.get(Calendar.MINUTE))
+                hours.emit(calendar.get(Calendar.HOUR))
+
+            }
+
+            println("Timer stopped")
+        }
+
+    }
+    
+    fun start(): Boolean {
+
+        if(isRunning){
+            return false
+        }
+
+        startTimer()
+
+        return true;
+
+    }
+
+    suspend fun stop(): Boolean {
+
+        if(timerJob == null){
+            return false
+        }
+
+        isRunning = false;
+
+        timerJob!!.join()
+
+        return true;
+
+    }
+
 }
