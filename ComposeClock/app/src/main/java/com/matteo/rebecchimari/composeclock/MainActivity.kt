@@ -12,50 +12,59 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.RectangleShape
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.modifier.modifierLocalConsumer
-import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.font.FontWeight.Companion.Bold
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.max
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
 import com.matteo.rebecchimari.composeclock.ui.theme.ComposeClockTheme
 import kotlinx.coroutines.*
-import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.*
 import java.util.*
-import java.util.Collections.rotate
-import java.util.concurrent.Flow
 
 class MainActivity : ComponentActivity() {
+
+    // Kotlin like Flutter (Dart)
+    // has removed the "new" keyword
+    val timerVM: TimerVM = TimerVM()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            ClockClockPage()
+            ClockClockPage(timerVM)
         }
     }
+
+    override fun onStart() {
+        super.onStart()
+        timerVM.start()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        timerVM.stop()
+    }
+
 }
 
 @Preview(showBackground = true, device = "id:pixel_5")
 @Composable
 fun DefaultPreview() {
-    ClockClockPage()
+    ClockClockPage(TimerVM())
 }
 
 
 @Composable
-fun ClockClockPage() {
+fun ClockClockPage(timerVM: TimerVM) {
 
     ComposeClockTheme {
         // A surface container using the 'background' color from the theme
@@ -65,7 +74,7 @@ fun ClockClockPage() {
         ) {
             Column() {
                 Box(Modifier.padding(10.dp)){
-                    ClockStateful()
+                    ClockStateful(timerVM)
                 }
             }
         }
@@ -74,20 +83,20 @@ fun ClockClockPage() {
 }
 
 @Composable
-fun ClockStateful() {
+fun ClockStateful(timerVM: TimerVM) {
 
-    // Kotlin like Flutter (Dart)
-    // has removed the "new" keyword
-    val timer: Timer = Timer()
+    val secondsState: State<Int> = timerVM.seconds.collectAsState(initial = 0)
+    val minuteState: State<Int> = timerVM.minutes.collectAsState(initial = 0)
+    val hoursState: State<Int> = timerVM.hours.collectAsState(initial = 0)
 
     ClockDialStateless()
     {
         // Seconds
-        ClockHand( 0.9f, 2, Color.Green)
+        ClockHand((360f/60f * secondsState.value),  0.9f, 2, Color.Green)
         // Minutes
-        ClockHand( 0.7f, 5, Color.Red)
+        ClockHand((360f/60f * minuteState.value), 0.6f, 5, Color.Red)
         // Hours
-        ClockHand( 0.4f, 10, Color.Black)
+        ClockHand((360f/12f * (hoursState.value % 12)), 0.4f, 10, Color.Black)
     }
 
 }
@@ -118,21 +127,10 @@ fun ClockDialStateless(
             Tick(i,ticksColor)
         }
 
-        // Dial (cover ticks)
-        /*Box(
-            Modifier
-                .fillMaxWidth()
-                .padding(10.dp)
-                .aspectRatio(ratio = 1f)
-                .clip(CircleShape)
-                .background(dialColor)
-        )*/
-
         // Ticks numbers
         for (i in 12 downTo 1){
             TickNumber(i-12, 12, "$i")
         }
-
 
         // Content
         content()
@@ -152,8 +150,8 @@ fun Tick(position: Int, color: Color = Color.Black,
         modifier = modifier
             .fillMaxHeight(1f)
             .width((width).dp)
-            .rotate(360f / 12 * position)
-            .padding(0.dp,4.dp)
+            .rotate((360f / 12f) * (position))
+            .padding(0.dp, 4.dp)
     ) {
 
         Box(modifier = modifier
@@ -189,8 +187,7 @@ fun TickNumber(
     text: String,
     color: Color = Color.Black
 ){
-    val rotation = 360f / maxPosition * position
-
+    val rotation = 0f //(360f / maxPosition) * position
 
     Column ( modifier = Modifier
         .fillMaxHeight()
@@ -211,7 +208,7 @@ fun TickNumber(
 
         Text(
             modifier = Modifier
-                .rotate(-1*rotation)
+                .rotate(-1 * rotation)
                 .padding(0.dp),
             text = text,
             color = color,
@@ -226,6 +223,7 @@ fun TickNumber(
 
 @Composable
 fun ClockHand(
+    rotation: Float,
     heightPercentage: Float = 0.3f,
     width: Int = 10,
     color: Color = Color.Black,
@@ -234,6 +232,7 @@ fun ClockHand(
     val shape = RoundedCornerShape((width*0.5).dp)
     Column(
         modifier = modifier
+            .rotate(rotation)
             .fillMaxHeight(heightPercentage)
             .width((width).dp)
             .offset(0.dp, 5.dp)) {
@@ -254,7 +253,7 @@ fun ClockHand(
 
 }
 
-class Timer() {
+class TimerVM : ViewModel() {
 
     val seconds = MutableSharedFlow<Int>();
     val minutes = MutableSharedFlow<Int>();
@@ -278,9 +277,9 @@ class Timer() {
     // while coroutineScope just suspends
 
     //private fun startTimer() = runBlocking {
-    private fun startTimer() = runBlocking {
+    private fun startTimer() {
 
-        timerJob = launch {
+        timerJob = viewModelScope.launch {
 
             println("Timer started")
 
@@ -292,13 +291,23 @@ class Timer() {
                 delay(1000)
 
                 val calendar = Calendar.getInstance()
-                seconds.emit(calendar.get(Calendar.SECOND))
-                minutes.emit(calendar.get(Calendar.MINUTE))
-                hours.emit(calendar.get(Calendar.HOUR))
+
+                val s: Int = calendar.get(Calendar.SECOND)
+                val m: Int = calendar.get(Calendar.MINUTE)
+                val h: Int = calendar.get(Calendar.HOUR)
+
+                seconds.emit(s)
+                minutes.emit(m)
+                hours.emit(h)
+
+                println("Hours: $h")
+                println("Minutes: $m")
+                println("Seconds: $s")
 
             }
 
             println("Timer stopped")
+
         }
 
     }
@@ -312,18 +321,20 @@ class Timer() {
         startTimer()
 
         return true;
-
     }
 
-    suspend fun stop(): Boolean {
+     fun stop(): Boolean {
 
         if(timerJob == null){
             return false
         }
 
-        isRunning = false;
+        viewModelScope.launch {
 
-        timerJob!!.join()
+            isRunning = false;
+            timerJob!!.join()
+
+        }
 
         return true;
 
