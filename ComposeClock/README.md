@@ -1,6 +1,6 @@
 # Compose Clock
 
-A Clock made using Jetpack compose library
+A Clock made using [Jetpack Compose](https://developer.android.com/jetpack/compose/documentation) library.
 
 <img src="./../github_assets/compose_clock.gif" height="250" width="250">
 
