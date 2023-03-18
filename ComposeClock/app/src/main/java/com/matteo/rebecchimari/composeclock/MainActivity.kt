@@ -35,7 +35,7 @@ class MainActivity : ComponentActivity() {
 
     // Kotlin like Flutter (Dart)
     // has removed the "new" keyword
-    val timerVM: TimerVM = TimerVM()
+    private val timerVM: TimerVM = TimerVM()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -85,18 +85,23 @@ fun ClockClockPage(timerVM: TimerVM) {
 @Composable
 fun ClockStateful(timerVM: TimerVM) {
 
-    val secondsState: State<Int> = timerVM.seconds.collectAsState(initial = 0)
-    val minuteState: State<Int> = timerVM.minutes.collectAsState(initial = 0)
-    val hoursState: State<Int> = timerVM.hours.collectAsState(initial = 0)
-
     ClockDialStateless()
     {
+
+        val secondsState: State<Int> = timerVM.seconds.collectAsState(initial = 0)
+        val minuteState: State<Int> = timerVM.minutes.collectAsState(initial = 0)
+        val hoursState: State<Int> = timerVM.hours.collectAsState(initial = 0)
+
         // Seconds
         ClockHand((360f/60f * secondsState.value),  0.9f, 2, Color.Green)
+
         // Minutes
         ClockHand((360f/60f * minuteState.value), 0.6f, 5, Color.Red)
+
         // Hours
         ClockHand((360f/12f * (hoursState.value % 12)), 0.4f, 10, Color.Black)
+
+
     }
 
 }
@@ -128,8 +133,8 @@ fun ClockDialStateless(
         }
 
         // Ticks numbers
-        for (i in 12 downTo 1){
-            TickNumber(i-12, 12, "$i")
+        for (i in 1..12){
+            TickNumber(i, 12, "$i")
         }
 
         // Content
@@ -187,7 +192,7 @@ fun TickNumber(
     text: String,
     color: Color = Color.Black
 ){
-    val rotation = 0f //(360f / maxPosition) * position
+    val rotation = (360f/maxPosition) * position
 
     Column ( modifier = Modifier
         .fillMaxHeight()
@@ -259,22 +264,24 @@ class TimerVM : ViewModel() {
     val minutes = MutableSharedFlow<Int>();
     val hours = MutableSharedFlow<Int>();
 
-    init {
-        runBlocking {
-            launch {
-                val calendar = Calendar.getInstance()
-                seconds.emit(calendar.get(Calendar.SECOND))
-                minutes.emit(calendar.get(Calendar.MINUTE))
-                hours.emit(calendar.get(Calendar.HOUR))
-            }
-        }
+    private suspend fun tick() {
+        val calendar = Calendar.getInstance()
+
+        val s: Int = calendar.get(Calendar.SECOND)
+        val m: Int = calendar.get(Calendar.MINUTE)
+        val h: Int = calendar.get(Calendar.HOUR)
+
+        seconds.emit(s)
+        minutes.emit(m)
+        hours.emit(h)
+
+        println("Hours: $h")
+        println("Minutes: $m")
+        println("Seconds: $s")
     }
 
     private var isRunning: Boolean = false;
     private var timerJob: Job? = null
-
-    // runBlocking method blocks the current thread for waiting
-    // while coroutineScope just suspends
 
     //private fun startTimer() = runBlocking {
     private fun startTimer() {
@@ -290,19 +297,7 @@ class TimerVM : ViewModel() {
                 // Wait 1 second
                 delay(1000)
 
-                val calendar = Calendar.getInstance()
-
-                val s: Int = calendar.get(Calendar.SECOND)
-                val m: Int = calendar.get(Calendar.MINUTE)
-                val h: Int = calendar.get(Calendar.HOUR)
-
-                seconds.emit(s)
-                minutes.emit(m)
-                hours.emit(h)
-
-                println("Hours: $h")
-                println("Minutes: $m")
-                println("Seconds: $s")
+                tick()
 
             }
 
